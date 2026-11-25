@@ -45029,8 +45029,10 @@ async function createPayment(seed, req, opts = {}, resource) {
   }
   const payer = Keypair.fromSeed(seed);
   const mint = new PublicKey(req.asset);
-  const feePayer = new PublicKey(req.extra.feePayer);
-  if (feePayer.equals(payer.publicKey)) throw new Error("The fee payer cannot be the payer.");
+  const selfPaid = opts.selfPaid === true;
+  const feePayer = selfPaid ? payer.publicKey : new PublicKey(req.extra.feePayer);
+  if (!selfPaid && feePayer.equals(payer.publicKey)) throw new Error("The fee payer cannot be the payer.");
+  const accepted = selfPaid ? { ...req, extra: { ...req.extra, feePayer: payer.publicKey.toBase58(), sponsored: false } } : req;
   const transfers = [];
   if (opts.guarded) {
     const multisig = new PublicKey(opts.guarded.multisig);
@@ -45076,7 +45078,7 @@ async function createPayment(seed, req, opts = {}, resource) {
   return {
     x402Version: 2,
     ...resource ? { resource } : {},
-    accepted: req,
+    accepted,
     payload: { transaction: bytesToBase64(tx.serialize()) }
   };
 }
@@ -45085,7 +45087,7 @@ function selectRequirements(required2) {
 }
 
 // ../sdk/src/client.ts
-var DEFAULT_BASE_URL = "https://omnia-superapp.vercel.app";
+var DEFAULT_BASE_URL = "https://omniasuper.app";
 var OmniaError = class extends Error {
   status;
   code;
@@ -45127,6 +45129,9 @@ var Omnia = class _Omnia {
   #seed;
   #fetch;
   #payFrom;
+  #networkFee;
+  /** Unix milliseconds until which the relayer has said it will not sponsor this agent. */
+  #selfPayUntil = 0;
   #feeWallet;
   #network = null;
   #mode = null;
@@ -45142,6 +45147,8 @@ var Omnia = class _Omnia {
     if (typeof f !== "function") throw new OmniaError(0, "invalid_options", "This runtime has no fetch. Pass one in the options.");
     this.#fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
     this.#payFrom = options.payFrom ?? "auto";
+    if (options.networkFee !== void 0 && !["auto", "sponsored", "self"].includes(options.networkFee)) throw new OmniaError(0, "invalid_options", 'networkFee must be "auto", "sponsored" or "self".');
+    this.#networkFee = options.networkFee ?? "auto";
     if (options.platformFeeWallet !== void 0 && !ADDRESS.test(options.platformFeeWallet)) throw new OmniaError(0, "invalid_options", "platformFeeWallet must be a Solana address.");
     this.#feeWallet = options.platformFeeWallet ?? null;
   }
@@ -45430,8 +45437,10 @@ var Omnia = class _Omnia {
     }
     const mode = this.#payFrom === "own" ? null : await this.walletMode();
     const guarded = mode && mode.mode === "guarded" && !mode.frozen ? { multisig: mode.multisig, ...mode.spendingLimit ? { spendingLimit: mode.spendingLimit } : {} } : void 0;
+    const unsponsored = req.extra.sponsored === false || Date.now() < this.#selfPayUntil;
+    const selfPaid = expect.selfPaid === true || this.#networkFee === "self" || this.#networkFee === "auto" && unsponsored;
     try {
-      return await createPayment(this.#seed, req, { maxAmount: limit, allowedSplitRecipients: feeWallet ? [feeWallet] : [], guarded }, required2.resource);
+      return await createPayment(this.#seed, req, { maxAmount: limit, allowedSplitRecipients: feeWallet ? [feeWallet] : [], guarded, selfPaid }, required2.resource);
     } catch (e) {
       throw new OmniaError(402, "payment_not_built", `The payment could not be built: ${e.message}`, required2);
     }
@@ -45442,7 +45451,15 @@ var Omnia = class _Omnia {
     const required2 = await readOffer(first.clone());
     if (!required2) return this.#json(first);
     const payload = await this.#buildPayment(required2, options.limit, { payTo: options.payTo });
-    const second = await this.#send(method, path, { body, sign: options.sign, payment: encodeHeader(payload) });
+    let second = await this.#send(method, path, { body, sign: options.sign, payment: encodeHeader(payload) });
+    if (second.status === 402 && this.#networkFee === "auto" && payload.accepted.extra.sponsored !== false) {
+      const refusal = await readRefusal(second.clone());
+      if (refusal) {
+        this.#selfPayUntil = refusal.until;
+        const again = await this.#buildPayment(required2, options.limit, { payTo: options.payTo, selfPaid: true });
+        second = await this.#send(method, path, { body, sign: options.sign, payment: encodeHeader(again) });
+      }
+    }
     const out = await this.#json(second);
     const header = second.headers.get(X402_HEADER.response);
     if (header && out && typeof out === "object") {
@@ -45501,6 +45518,18 @@ var Omnia = class _Omnia {
     return body;
   }
 };
+async function readRefusal(res) {
+  try {
+    const body = await res.json();
+    const err2 = body?.error && typeof body.error === "object" ? body.error : null;
+    if ((err2?.code ?? body?.code) !== "sponsorship_unavailable") return null;
+    const s = err2?.sponsorship;
+    const daily = s?.reason === "daily_limit" && typeof s.resetsAt === "number" && s.resetsAt * 1e3 > Date.now();
+    return { until: daily ? s.resetsAt * 1e3 : Date.now() + 6e5 };
+  } catch {
+    return null;
+  }
+}
 async function readOffer(res) {
   const header = res.headers.get(X402_HEADER.required);
   if (header) {
@@ -45673,7 +45702,7 @@ var TOOLS = [
         address: out.client.address,
         profile: out.client.profileUrl,
         identityFile: out.path,
-        topUp: { address: out.client.address, asset: "USDC", network: "Solana", note: "Send USDC to this address to fund paid calls. No SOL is needed: the Omnia relayer pays the network fee." }
+        topUp: { address: out.client.address, asset: "USDC", network: "Solana", note: "Send USDC to this address to fund paid calls. No SOL is needed to start: the Omnia relayer pays the network fee of the first 200 payments a day." }
       };
     }
   },
@@ -45902,7 +45931,7 @@ var TOOLS = [
         kind: { type: "string", enum: ["http", "mcp"], description: "http: the endpoint receives the input as a JSON POST. mcp: the endpoint is an MCP server and mcp_tool names the tool." },
         endpoint: { type: "string", description: "An https URL." },
         mcp_tool: { type: "string", description: "The tool name, for kind mcp." },
-        price: { ...usdcText, description: "The price per call in USDC, between 0.001 and 100." },
+        price: { ...usdcText, description: "The price per call in USDC, between 0.005 and 100." },
         pay_to: { type: "string", description: "The Solana wallet that is paid. Defaults to this agent's own address." },
         input_schema: { type: "object", description: "The JSON Schema of the input. Optional.", additionalProperties: true },
         example: { type: "object", description: "An example as { input, output }. Optional.", additionalProperties: true }

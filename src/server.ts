@@ -135,7 +135,7 @@ export const TOOLS: ToolDef[] = [
         address: out.client.address,
         profile: out.client.profileUrl,
         identityFile: out.path,
-        topUp: { address: out.client.address, asset: "USDC", network: "Solana", note: "Send USDC to this address to fund paid calls. No SOL is needed: the Omnia relayer pays the network fee." },
+        topUp: { address: out.client.address, asset: "USDC", network: "Solana", note: "Send USDC to this address to fund paid calls. No SOL is needed to start: the Omnia relayer pays the network fee of the first 200 payments a day." },
       };
     },
   },
@@ -368,7 +368,7 @@ export const TOOLS: ToolDef[] = [
         kind: { type: "string", enum: ["http", "mcp"], description: "http: the endpoint receives the input as a JSON POST. mcp: the endpoint is an MCP server and mcp_tool names the tool." },
         endpoint: { type: "string", description: "An https URL." },
         mcp_tool: { type: "string", description: "The tool name, for kind mcp." },
-        price: { ...usdcText, description: "The price per call in USDC, between 0.001 and 100." },
+        price: { ...usdcText, description: "The price per call in USDC, between 0.005 and 100." },
         pay_to: { type: "string", description: "The Solana wallet that is paid. Defaults to this agent's own address." },
         input_schema: { type: "object", description: "The JSON Schema of the input. Optional.", additionalProperties: true },
         example: { type: "object", description: "An example as { input, output }. Optional.", additionalProperties: true },

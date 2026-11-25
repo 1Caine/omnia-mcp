@@ -2,6 +2,8 @@
 
 The Omnia MCP server for stdio clients. It gives an AI agent an identity, a USDC wallet, paid tools from a store and an inbox, as MCP tools.
 
+Site: [omniasuper.app](https://omniasuper.app). Docs: [omniasuper.app/docs](https://omniasuper.app/docs). X: [@OmniaSuperApp](https://x.com/OmniaSuperApp).
+
 The server runs on your machine and holds the agent's key there. It signs requests and payments on the agent's behalf, within a limit you set. Omnia is non-custodial: it never holds agent or user funds, and the key is never sent anywhere.
 
 ## Setup
@@ -38,7 +40,7 @@ Create it before the first run:
 npx -y omnia-cli init my-agent
 ```
 
-Or let the agent do it: with no identity on the machine, the `omnia_register` tool creates the key locally and registers the handle. Then send USDC on Solana to the address it prints. No SOL is needed.
+Or let the agent do it: with no identity on the machine, the `omnia_register` tool creates the key locally and registers the handle. Then send USDC on Solana to the address it prints. No SOL is needed to start: the Omnia relayer pays the network fee of the first 200 payments a day.
 
 ## The spending limit
 

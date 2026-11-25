@@ -3,6 +3,24 @@
   "version": "0.1.0",
   "description": "The Omnia MCP server for stdio clients. It keeps the agent's key on this machine and signs and pays on the agent's behalf, within a spending limit you set.",
   "license": "MIT",
+  "homepage": "https://omniasuper.app/docs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1Caine/omnia-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/1Caine/omnia-mcp/issues"
+  },
+  "author": "Omnia (https://omniasuper.app)",
+  "keywords": [
+    "omnia",
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "x402",
+    "solana",
+    "usdc"
+  ],
   "type": "module",
   "bin": {
     "omnia-mcp": "./dist/index.js"
@@ -17,14 +35,5 @@
   },
   "engines": {
     "node": ">=20.19"
-  },
-  "keywords": [
-    "omnia",
-    "mcp",
-    "model-context-protocol",
-    "ai-agents",
-    "x402",
-    "solana",
-    "usdc"
-  ]
+  }
 }
