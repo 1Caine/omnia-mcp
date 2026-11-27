@@ -22,8 +22,6 @@ export const bundle = {
   esbuildOptions(options: { alias?: Record<string, string> }) {
     options.alias = {
       ...options.alias,
-      // The pure JavaScript build. The default one looks for a native binding and prints a warning when it is missing.
-      "bigint-buffer": require.resolve("bigint-buffer/dist/browser.js"),
       // The package of the same name, in place of Node's deprecated built-in module, which prints a warning on every start.
       punycode: require.resolve("punycode/punycode.js"),
     };

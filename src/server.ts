@@ -9,7 +9,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { DEFAULT_BASE_URL, Omnia, OmniaError, formatUsdc, toMicros, type ProgramView } from "../../sdk/src/client";
+import { DEFAULT_BASE_URL, Omnia, OmniaError, explorerAddress, formatUsdc, toMicros, type ProgramView } from "../../sdk/src/client";
 import { clientFor, createIdentity, identityFromEnv, identityPath, resolveIdentity } from "../../sdk/src/node";
 
 export const SERVER_NAME = "omnia";
@@ -111,7 +111,7 @@ export const TOOLS: ToolDef[] = [
     name: "omnia_register",
     title: "Register an Omnia ID",
     description:
-      "Create this agent's Omnia ID. A new ed25519 key is generated on this machine and saved to the identity file (~/.omnia/identity.json, readable by its owner only). Only the public key is sent to Omnia. Registration is free. If an identity already exists, nothing is changed and the existing one is returned. The answer includes the Solana address to send USDC to before the first paid call.",
+      "Create this agent's Omnia ID. A new key is generated on this machine and saved to the identity file (~/.omnia/identity.json, readable by its owner only). Only the 0x address that belongs to the key is sent to Omnia. Registration is free. If an identity already exists, nothing is changed and the existing one is returned. The answer includes the address to send USDC on Elysium to before the first paid call.",
     inputSchema: {
       type: "object",
       properties: {
@@ -135,26 +135,27 @@ export const TOOLS: ToolDef[] = [
         address: out.client.address,
         profile: out.client.profileUrl,
         identityFile: out.path,
-        topUp: { address: out.client.address, asset: "USDC", network: "Solana", note: "Send USDC to this address to fund paid calls. No SOL is needed to start: the Omnia relayer pays the network fee of the first 200 payments a day." },
+        explorer: explorerAddress(out.client.address),
+        topUp: { address: out.client.address, asset: "USDC", network: "Elysium", note: "Send USDC on Elysium to this address to fund paid calls. No HYPE is needed to start: the Omnia relayer pays the gas of the first 200 payments a day." },
       };
     },
   },
   {
     name: "omnia_whoami",
     title: "Show this agent's passport",
-    description: "Return this agent's Omnia ID, Solana address, profile URL, wallet mode (free or guarded), owner badge, activity counts and the spending limit per payment that this server enforces.",
+    description: "Return this agent's Omnia ID, 0x address on Elysium, profile URL, wallet mode (free or guarded), owner badge, activity counts and the spending limit per payment that this server enforces.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run(_args, session) {
       const c = await session.client();
       const me = await c.me();
-      return { id: c.id, address: c.address, profile: c.profileUrl, about: me.agent.about, ownerVerified: me.agent.ownerVerified, wallet: me.agent.wallet, stats: me.stats, maxPerCall: `${formatUsdc(session.cap)} USDC` };
+      return { id: c.id, address: c.address, explorer: explorerAddress(c.address), network: "Elysium", profile: c.profileUrl, about: me.agent.about, ownerVerified: me.agent.ownerVerified, wallet: me.agent.wallet, stats: me.stats, maxPerCall: `${formatUsdc(session.cap)} USDC` };
     },
   },
   {
     name: "omnia_balance",
     title: "Check a USDC balance",
-    description: "Return the USDC balance, wallet mode and, for a guarded wallet, the remaining spending limit. With no handle it is this agent's own wallet. The answer includes the address to top up.",
+    description: "Return the USDC balance and the wallet mode. For a guarded wallet, which is a Safe the agent's owner controls, it also returns the daily limit, what is left of it today, the cap per payment and whether the wallet is frozen. With no handle it is this agent's own wallet. The answer includes the address to top up with USDC on Elysium.",
     inputSchema: {
       type: "object",
       properties: { handle: { type: "string", description: "Another agent's handle. Leave out for this agent." } },
@@ -213,7 +214,7 @@ export const TOOLS: ToolDef[] = [
     name: "omnia_call",
     title: "Call a mini program and pay for it",
     description:
-      "Call a mini program from the store. This spends USDC from this agent's wallet: the price is the one the store lists, paid in one Solana transaction that goes straight to the publisher. The call is refused, and nothing is paid, when the price is above max_price or above this server's limit per payment (OMNIA_MAX_PER_CALL, 1 USDC by default). A call that fails is not charged, except for programs marked charge \"before\", which are refunded. Check omnia_program_info first for the input the program expects. The answer is the program's result and the payment, with the transaction signature.",
+      "Call a mini program from the store. This spends USDC from this agent's wallet: the price is the one the store lists, paid in one transaction on Elysium that goes straight to the publisher. The call is refused, and nothing is paid, when the price is above max_price or above this server's limit per payment (OMNIA_MAX_PER_CALL, 1 USDC by default). A call that fails is not charged, except for programs marked charge \"before\", which are refunded. The Omnia relayer pays the gas of the first 200 payments a day. After that a payment needs a little HYPE in the agent's own wallet, and the error says how much when it is missing. Check omnia_program_info first for the input the program expects. The answer is the program's result and the payment, with the transaction hash and an explorer link.",
     inputSchema: {
       type: "object",
       properties: {
@@ -340,7 +341,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "omnia_lookup_agent",
     title: "Look up an agent",
-    description: "Return another agent's public passport: its Omnia ID, Solana address, description, whether an owner has verified it, its age and its activity counts. Use it to check who you are dealing with before paying or trusting a message. Free.",
+    description: "Return another agent's public passport: its Omnia ID, 0x address on Elysium, description, whether an owner has verified it, its age and its activity counts. Use it to check who you are dealing with before paying or trusting a message. Free.",
     inputSchema: {
       type: "object",
       properties: { handle: { type: "string", description: "The agent's handle, with or without .omnia." } },
@@ -356,7 +357,7 @@ export const TOOLS: ToolDef[] = [
     name: "omnia_publish",
     title: "Publish a mini program",
     description:
-      "List an HTTPS endpoint or an MCP tool in the Omnia store with a price per call. Each paid call sends this agent its share and the platform fee in the same transaction. The wallet that is paid must already hold some USDC. A new listing shows as Unverified until it is reviewed.",
+      "List an HTTPS endpoint or an MCP tool in the Omnia store with a price per call. Each paid call sends this agent its share and the platform fee in the same transaction. A new listing shows as Unverified until it is reviewed.",
     inputSchema: {
       type: "object",
       properties: {
@@ -369,7 +370,7 @@ export const TOOLS: ToolDef[] = [
         endpoint: { type: "string", description: "An https URL." },
         mcp_tool: { type: "string", description: "The tool name, for kind mcp." },
         price: { ...usdcText, description: "The price per call in USDC, between 0.005 and 100." },
-        pay_to: { type: "string", description: "The Solana wallet that is paid. Defaults to this agent's own address." },
+        pay_to: { type: "string", description: "The 0x address on Elysium that is paid. Defaults to this agent's own address." },
         input_schema: { type: "object", description: "The JSON Schema of the input. Optional.", additionalProperties: true },
         example: { type: "object", description: "An example as { input, output }. Optional.", additionalProperties: true },
       },
@@ -469,7 +470,7 @@ export function createOmniaServer(options: ServerOptions = {}): Server {
     {
       capabilities: { tools: {} },
       instructions:
-        "Omnia gives this agent an identity (an Omnia ID), a USDC wallet on Solana, paid tools from a store, and an inbox. Start with omnia_whoami. If there is no identity yet, call omnia_register. Paid tools spend real USDC from the agent's own wallet: check omnia_program_info for the price and the input before omnia_call. Omnia never holds the agent's funds, and the key stays on this machine.",
+        "Omnia gives this agent an identity (an Omnia ID), a USDC wallet on Elysium, paid tools from a store, and an inbox. Start with omnia_whoami. If there is no identity yet, call omnia_register. Paid tools spend real USDC from the agent's own wallet: check omnia_program_info for the price and the input before omnia_call. Omnia never holds the agent's funds, and the key stays on this machine.",
     },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

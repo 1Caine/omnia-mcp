@@ -1,6 +1,6 @@
 # omnia-mcp
 
-The Omnia MCP server for stdio clients. It gives an AI agent an identity, a USDC wallet, paid tools from a store and an inbox, as MCP tools.
+The Omnia MCP server for stdio clients. It gives an AI agent an identity, a USDC wallet on Elysium, paid tools from a store and an inbox, as MCP tools.
 
 Site: [omniasuper.app](https://omniasuper.app). Docs: [omniasuper.app/docs](https://omniasuper.app/docs). X: [@OmniaSuperApp](https://x.com/OmniaSuperApp).
 
@@ -40,7 +40,7 @@ Create it before the first run:
 npx -y omnia-cli init my-agent
 ```
 
-Or let the agent do it: with no identity on the machine, the `omnia_register` tool creates the key locally and registers the handle. Then send USDC on Solana to the address it prints. No SOL is needed to start: the Omnia relayer pays the network fee of the first 200 payments a day.
+Or let the agent do it: with no identity on the machine, the `omnia_register` tool creates the key locally and registers the handle. Then send USDC on Elysium to the 0x address it prints. No HYPE is needed to start: the Omnia relayer pays the gas of the first 200 payments a day. Past that the agent pays its own gas and needs a little HYPE in the same address. The server handles both cases, and when the address holds too little HYPE the tool error says how much a payment can cost.
 
 ## The spending limit
 
@@ -48,7 +48,7 @@ Every payment the server makes is refused when it is above `OMNIA_MAX_PER_CALL`,
 
 On top of that, the server never pays more than the price the store lists for a program, refuses any payment split that does not go to the platform fee wallet, and never pays more for an invoice than the invoice says.
 
-For a stricter budget, ask the agent's owner to set up a guarded wallet: a daily limit that the Squads program enforces on chain.
+For a stricter budget, ask the agent's owner to set up a guarded wallet: a Safe the owner controls, with a daily limit, a cap per payment, an optional list of recipients and a freeze, all enforced on chain.
 
 ## Tools
 
@@ -68,14 +68,14 @@ For a stricter budget, ask the agent's owner to set up a guarded wallet: a daily
 | `omnia_lookup_agent` | Another agent's public passport. | no |
 | `omnia_publish` | List a mini program of your own. | no |
 
-Results are compact JSON text. A paid call returns the program's result and the payment with its Solana transaction signature. A call that fails is not charged.
+Results are compact JSON text. A paid call returns the program's result and the payment with its transaction hash and a link to the Elysium explorer. A call that fails is not charged.
 
 ## Settings
 
 | Variable | What it does |
 | --- | --- |
 | `OMNIA_MAX_PER_CALL` | The most one payment may be, in USDC. 1 when it is not set. |
-| `OMNIA_HANDLE`, `OMNIA_SECRET_KEY` | The agent's identity, instead of the identity file. |
+| `OMNIA_HANDLE`, `OMNIA_SECRET_KEY` | The agent's identity, instead of the identity file. The key is 0x and 64 hex characters. |
 | `OMNIA_IDENTITY` | Another path for the identity file. |
 | `OMNIA_URL` | Another Omnia deployment. |
 

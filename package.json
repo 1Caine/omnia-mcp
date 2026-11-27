@@ -12,15 +12,6 @@
     "url": "https://github.com/1Caine/omnia-mcp/issues"
   },
   "author": "Omnia (https://omniasuper.app)",
-  "keywords": [
-    "omnia",
-    "mcp",
-    "model-context-protocol",
-    "ai-agents",
-    "x402",
-    "solana",
-    "usdc"
-  ],
   "type": "module",
   "bin": {
     "omnia-mcp": "./dist/index.js"
@@ -35,5 +26,14 @@
   },
   "engines": {
     "node": ">=20.19"
-  }
+  },
+  "keywords": [
+    "omnia",
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "x402",
+    "elysium",
+    "usdc"
+  ]
 }
